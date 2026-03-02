@@ -3,27 +3,30 @@ const MODEL = 'gemini-2.0-flash';
 
 /**
  * Calls the Google Gemini generateContent API and returns the text response.
+ * Supports both single-prompt and system+user prompt patterns.
  * @param {string} apiKey - Google AI API key provided by the user.
- * @param {string} prompt - The prompt to send to Gemini.
+ * @param {string} promptOrSystem - Single prompt, or system instruction when userMessage is provided.
+ * @param {string} [userMessage] - Optional user message (enables system instruction mode).
  * @returns {Promise<string>} The generated text content.
  */
-export async function runGemini(apiKey, prompt) {
+export async function runGemini(apiKey, promptOrSystem, userMessage) {
   if (!apiKey) throw new Error('Gemini API key is required.');
 
   const url = `${GEMINI_BASE_URL}/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
 
+  const body = userMessage
+    ? {
+        systemInstruction: { parts: [{ text: promptOrSystem }] },
+        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+      }
+    : {
+        contents: [{ parts: [{ text: promptOrSystem }] }],
+      };
+
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [{ text: prompt }],
-        },
-      ],
-    }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {

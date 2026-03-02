@@ -121,20 +121,29 @@ export default function SkillWorkspace({
 
   const getRequiredApiKey = () => {
     const engine = skill.aiEngine;
-    if (engine === 'openai') return apiKeys?.openai;
-    if (engine === 'perplexity') return apiKeys?.perplexity;
+    if (engine === 'openai') return apiKeys?.openai || apiKeys?.gemini;
+    if (engine === 'perplexity') return apiKeys?.perplexity || apiKeys?.gemini;
     if (engine === 'gemini') return apiKeys?.gemini;
     return null;
+  };
+
+  const getActiveEngine = () => {
+    const engine = skill.aiEngine;
+    if (engine === 'openai' && !apiKeys?.openai && apiKeys?.gemini) return 'gemini';
+    if (engine === 'perplexity' && !apiKeys?.perplexity && apiKeys?.gemini) return 'gemini';
+    return engine;
   };
 
   const handleGenerate = async () => {
     const apiKey = getRequiredApiKey();
     if (!apiKey) {
       setError(
-        `API key for ${ENGINE_LABELS[skill.aiEngine] || skill.aiEngine} is missing. Please add it in Settings.`
+        `API key for ${ENGINE_LABELS[skill.aiEngine] || skill.aiEngine} is missing. Add it in Settings, or add a free Gemini key as a fallback.`
       );
       return;
     }
+
+    const activeEngine = getActiveEngine();
 
     setIsLoading(true);
     setError(null);
@@ -144,16 +153,14 @@ export default function SkillWorkspace({
       const userMessage = buildUserMessage();
       let result;
 
-      if (skill.aiEngine === 'openai') {
+      if (activeEngine === 'openai') {
         result = await runOpenAI(apiKey, skill.systemPrompt, userMessage);
-      } else if (skill.aiEngine === 'perplexity') {
+      } else if (activeEngine === 'perplexity') {
         result = await runPerplexity(apiKey, skill.systemPrompt, userMessage);
-      } else if (skill.aiEngine === 'gemini') {
-        // Gemini takes a single prompt, so combine system prompt and user message
-        const combinedPrompt = `${skill.systemPrompt}\n\n---\n\n${userMessage}`;
-        result = await runGemini(apiKey, combinedPrompt);
+      } else if (activeEngine === 'gemini') {
+        result = await runGemini(apiKey, skill.systemPrompt, userMessage);
       } else {
-        throw new Error(`Unknown AI engine: ${skill.aiEngine}`);
+        throw new Error(`Unknown AI engine: ${activeEngine}`);
       }
 
       setOutput(result);
@@ -256,7 +263,8 @@ export default function SkillWorkspace({
                 </span>
               )}
               <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-accent/15 text-accent">
-                {ENGINE_LABELS[skill.aiEngine] || skill.aiEngine}
+                {ENGINE_LABELS[getActiveEngine()] || getActiveEngine()}
+                {getActiveEngine() !== skill.aiEngine && ' (fallback)'}
               </span>
             </div>
           </div>
@@ -286,8 +294,7 @@ export default function SkillWorkspace({
         >
           <AlertTriangle size={18} className="text-amber shrink-0" />
           <p className="text-sm text-amber">
-            {ENGINE_LABELS[skill.aiEngine] || skill.aiEngine} API key is missing. Add it in Settings to use this
-            skill.
+            {ENGINE_LABELS[skill.aiEngine] || skill.aiEngine} API key is missing. Add it in Settings, or add a free Gemini key as a fallback.
           </p>
         </div>
       )}

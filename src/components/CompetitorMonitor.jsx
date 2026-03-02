@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Search, Eye, Trash2, RefreshCw, Download, ArrowUpDown } from 'lucide-react';
 import { runPerplexity } from '../services/perplexityService';
+import { runGemini } from '../services/geminiService';
 
 function CompetitorCard({ competitor, onDelete, onResearch, isResearching }) {
   const hasChanged = competitor.snapshots?.length > 1;
@@ -178,12 +179,14 @@ export default function CompetitorMonitor({ competitors, businessName, apiKeys, 
   const [search, setSearch] = useState('');
 
   const handleResearch = async (competitor) => {
-    if (!apiKeys?.perplexity) {
-      alert('Please add your Perplexity API key in Settings to use AI research.');
+    const researchKey = apiKeys?.perplexity || apiKeys?.gemini;
+    if (!researchKey) {
+      alert('Please add a Perplexity or Gemini API key in Settings to use AI research.');
       return;
     }
     setResearchingId(competitor.id);
     try {
+      const systemPrompt = 'You are a competitive intelligence analyst. Respond only with valid JSON, no markdown formatting.';
       const prompt = `Research the company "${competitor.name}" (${competitor.url || 'no website provided'}).
 
 Provide a JSON response with this exact structure (no markdown, just JSON):
@@ -195,10 +198,9 @@ Provide a JSON response with this exact structure (no markdown, just JSON):
   "weaknesses": "Key weaknesses in 1-2 sentences"
 }`;
 
-      const result = await runPerplexity(apiKeys.perplexity,
-        'You are a competitive intelligence analyst. Respond only with valid JSON, no markdown formatting.',
-        prompt
-      );
+      const result = apiKeys?.perplexity
+        ? await runPerplexity(apiKeys.perplexity, systemPrompt, prompt)
+        : await runGemini(apiKeys.gemini, systemPrompt, prompt);
 
       try {
         const cleaned = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
