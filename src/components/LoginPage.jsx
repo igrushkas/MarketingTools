@@ -1,7 +1,7 @@
 import { Megaphone } from 'lucide-react';
 import { signInWithGoogle } from '../services/authService';
 
-export default function LoginPage({ onError }) {
+export default function LoginPage({ onError, error }) {
   const handleSignIn = async () => {
     try {
       await signInWithGoogle();
@@ -23,6 +23,13 @@ export default function LoginPage({ onError }) {
           AI-powered marketing dashboard for growing your business.
           25 skills, competitor tracking, and automation — all in one place.
         </p>
+
+        {error && (
+          <div className="mb-6 px-4 py-3 rounded-xl text-sm text-[#f43f5e]"
+               style={{ background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.2)' }}>
+            {error}
+          </div>
+        )}
 
         <button
           onClick={handleSignIn}
