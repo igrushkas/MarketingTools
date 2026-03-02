@@ -1,6 +1,20 @@
 import { useState } from 'react';
-import { Plus, Search, Eye, Trash2, RefreshCw, Download, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, RefreshCw, Download, ArrowUpDown, Zap } from 'lucide-react';
 import { runPerplexity } from '../services/perplexityService';
+import { runGemini } from '../services/geminiService';
+
+const PRESET_COMPETITORS = [
+  { name: 'Smith.ai', url: 'https://smith.ai', description: 'AI + live human hybrid receptionist service for calls, chats, and intake' },
+  { name: 'My AI Front Desk', url: 'https://www.myaifrontdesk.com', description: 'AI virtual receptionist that answers calls 24/7, schedules appointments, and transfers calls' },
+  { name: 'Dialzara', url: 'https://dialzara.com', description: 'AI answering service for small business — handles calls, books appointments, qualifies leads' },
+  { name: 'Upfirst', url: 'https://upfirst.ai', description: 'AI answering service and virtual receptionist for small businesses starting at $24.95/mo' },
+  { name: 'Goodcall', url: 'https://www.goodcall.com', description: 'AI phone agent for small businesses — answers calls, captures leads, books appointments' },
+  { name: 'Synthflow', url: 'https://synthflow.ai', description: 'AI voice agent platform with multi-language support and workflow automation' },
+  { name: 'Rosie AI', url: 'https://www.heyrosie.com', description: 'AI answering service for home services — captures leads and books jobs from missed calls' },
+  { name: 'Allo', url: 'https://www.withallo.com', description: 'AI receptionist that answers calls, takes messages, and routes to the right person' },
+  { name: 'Abby Connect', url: 'https://www.abbyconnect.com', description: 'AI-human hybrid receptionist with HIPAA compliance for legal, medical, and professional services' },
+  { name: 'RingCentral AI Receptionist', url: 'https://www.ringcentral.com/ai-receptionist.html', description: 'Enterprise AI receptionist that answers and routes business calls 24/7' },
+];
 
 function CompetitorCard({ competitor, onDelete, onResearch, isResearching }) {
   const hasChanged = competitor.snapshots?.length > 1;
@@ -176,14 +190,28 @@ export default function CompetitorMonitor({ competitors, businessName, apiKeys, 
   const [showForm, setShowForm] = useState(false);
   const [researchingId, setResearchingId] = useState(null);
   const [search, setSearch] = useState('');
+  const [isLoadingPreset, setIsLoadingPreset] = useState(false);
+
+  const existingNames = new Set(competitors.map(c => c.name.toLowerCase()));
+
+  const handleLoadPreset = async () => {
+    setIsLoadingPreset(true);
+    const toAdd = PRESET_COMPETITORS.filter(p => !existingNames.has(p.name.toLowerCase()));
+    for (const comp of toAdd) {
+      await onAdd(comp);
+    }
+    setIsLoadingPreset(false);
+  };
 
   const handleResearch = async (competitor) => {
-    if (!apiKeys?.perplexity) {
-      alert('Please add your Perplexity API key in Settings to use AI research.');
+    const researchKey = apiKeys?.perplexity || apiKeys?.gemini;
+    if (!researchKey) {
+      alert('Please add a Perplexity or Gemini API key in Settings to use AI research.');
       return;
     }
     setResearchingId(competitor.id);
     try {
+      const systemPrompt = 'You are a competitive intelligence analyst. Respond only with valid JSON, no markdown formatting.';
       const prompt = `Research the company "${competitor.name}" (${competitor.url || 'no website provided'}).
 
 Provide a JSON response with this exact structure (no markdown, just JSON):
@@ -195,10 +223,9 @@ Provide a JSON response with this exact structure (no markdown, just JSON):
   "weaknesses": "Key weaknesses in 1-2 sentences"
 }`;
 
-      const result = await runPerplexity(apiKeys.perplexity,
-        'You are a competitive intelligence analyst. Respond only with valid JSON, no markdown formatting.',
-        prompt
-      );
+      const result = apiKeys?.perplexity
+        ? await runPerplexity(apiKeys.perplexity, systemPrompt, prompt)
+        : await runGemini(apiKeys.gemini, systemPrompt, prompt);
 
       try {
         const cleaned = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -219,6 +246,27 @@ Provide a JSON response with this exact structure (no markdown, just JSON):
     } finally {
       setResearchingId(null);
     }
+  };
+
+  const [isResearchingAll, setIsResearchingAll] = useState(false);
+
+  const handleResearchAll = async () => {
+    const researchKey = apiKeys?.perplexity || apiKeys?.gemini;
+    if (!researchKey) {
+      alert('Please add a Perplexity or Gemini API key in Settings to use AI research.');
+      return;
+    }
+    setIsResearchingAll(true);
+    for (const comp of competitors) {
+      setResearchingId(comp.id);
+      try {
+        await handleResearch(comp);
+      } catch {
+        // continue to next competitor on failure
+      }
+    }
+    setResearchingId(null);
+    setIsResearchingAll(false);
   };
 
   const handleAdd = (form) => {
@@ -259,9 +307,16 @@ Provide a JSON response with this exact structure (no markdown, just JSON):
         </div>
         <div className="flex gap-2">
           {competitors.length > 0 && (
-            <button onClick={handleExport} className="btn-secondary text-sm flex items-center gap-1.5">
-              <Download className="w-3.5 h-3.5" /> Export
-            </button>
+            <>
+              <button onClick={handleResearchAll} disabled={isResearchingAll || researchingId}
+                      className="btn-secondary text-sm flex items-center gap-1.5">
+                <RefreshCw className={`w-3.5 h-3.5 ${isResearchingAll ? 'animate-spin' : ''}`} />
+                {isResearchingAll ? 'Researching...' : 'Research All'}
+              </button>
+              <button onClick={handleExport} className="btn-secondary text-sm flex items-center gap-1.5">
+                <Download className="w-3.5 h-3.5" /> Export
+              </button>
+            </>
           )}
           <button onClick={() => setShowForm(true)} className="btn-primary text-sm flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> Add Competitor
@@ -302,10 +357,20 @@ Provide a JSON response with this exact structure (no markdown, just JSON):
         <div className="card p-12 text-center">
           <Eye className="w-10 h-10 text-[#64748b] mx-auto mb-3" />
           <p className="text-[#94a3b8] mb-2">No competitors tracked yet</p>
-          <p className="text-sm text-[#64748b] mb-4">Add your competitors to track their pricing, features, and changes over time.</p>
-          <button onClick={() => setShowForm(true)} className="btn-primary text-sm">
-            Add Your First Competitor
-          </button>
+          <p className="text-sm text-[#64748b] mb-4">Load 10 pre-researched AI answering service competitors, or add your own manually.</p>
+          <div className="flex gap-3 justify-center">
+            <button onClick={handleLoadPreset} disabled={isLoadingPreset}
+                    className="btn-primary text-sm flex items-center gap-1.5">
+              {isLoadingPreset ? (
+                <><div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Loading...</>
+              ) : (
+                <><Zap className="w-3.5 h-3.5" /> Load All Competitors</>
+              )}
+            </button>
+            <button onClick={() => setShowForm(true)} className="btn-secondary text-sm flex items-center gap-1.5">
+              <Plus className="w-3.5 h-3.5" /> Add Manually
+            </button>
+          </div>
         </div>
       )}
 

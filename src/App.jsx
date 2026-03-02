@@ -20,10 +20,13 @@ import AutomationPanel from './components/AutomationPanel';
 import VideoGenerator from './components/VideoGenerator';
 import skills from './data/marketingSkills';
 
+const ALLOWED_EMAILS = ['irishka.lebedeva@gmail.com'];
+
 export default function App() {
   // Auth
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
 
   // Navigation
   const [activePage, setActivePage] = useState('dashboard');
@@ -40,10 +43,18 @@ export default function App() {
   const [showBusinessForm, setShowBusinessForm] = useState(false);
   const [editingBusiness, setEditingBusiness] = useState(false);
 
-  // Auth listener
+  // Auth listener with email whitelist
   useEffect(() => {
-    return onAuthChange((u) => {
+    return onAuthChange(async (u) => {
+      if (u && !ALLOWED_EMAILS.includes(u.email)) {
+        await signOutUser();
+        setUser(null);
+        setAuthError('Access denied. This app is restricted to authorized users only.');
+        setAuthLoading(false);
+        return;
+      }
       setUser(u);
+      setAuthError(null);
       setAuthLoading(false);
     });
   }, []);
@@ -157,7 +168,7 @@ export default function App() {
 
   // Not logged in
   if (!user) {
-    return <LoginPage />;
+    return <LoginPage onError={setAuthError} error={authError} />;
   }
 
   // KPI data for dashboard

@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { Key, Eye, EyeOff, Save, CheckCircle2 } from 'lucide-react';
 
 const KEY_FIELDS = [
-  { id: 'openai', label: 'OpenAI API Key', placeholder: 'sk-...', description: 'Powers 18 marketing skills (copywriting, CRO, strategy)' },
-  { id: 'perplexity', label: 'Perplexity API Key', placeholder: 'pplx-...', description: 'Powers SEO, competitor analysis, and research skills' },
-  { id: 'gemini', label: 'Google Gemini API Key', placeholder: 'AI...', description: 'Powers video generation and image content' },
-  { id: 'n8nWebhook', label: 'n8n Webhook Base URL', placeholder: 'https://your-n8n.com/webhook/...', description: 'Triggers automation workflows' },
+  { id: 'gemini', label: 'Google Gemini API Key (FREE)', placeholder: 'AI...', description: 'Free tier — powers all 25 skills as fallback. Get your key at aistudio.google.com', highlight: true },
+  { id: 'openai', label: 'OpenAI API Key', placeholder: 'sk-...', description: 'Optional — GPT-4o for copywriting, CRO, strategy. Falls back to Gemini if empty' },
+  { id: 'perplexity', label: 'Perplexity API Key', placeholder: 'pplx-...', description: 'Optional — Perplexity for SEO & research with live web search. Falls back to Gemini if empty' },
+  { id: 'n8nWebhook', label: 'n8n Webhook Base URL', placeholder: 'https://your-n8n.com/webhook/...', description: 'Optional — triggers automation workflows' },
 ];
 
 export default function ApiKeysPanel({ apiKeys, onSave }) {
@@ -38,8 +38,11 @@ export default function ApiKeysPanel({ apiKeys, onSave }) {
 
       <div className="space-y-4">
         {KEY_FIELDS.map((field) => (
-          <div key={field.id} className="card p-4">
-            <label className="block text-sm font-medium text-white mb-1">{field.label}</label>
+          <div key={field.id} className="card p-4" style={field.highlight ? { borderColor: 'rgba(16,185,129,0.3)' } : {}}>
+            <label className="block text-sm font-medium text-white mb-1">
+              {field.label}
+              {field.highlight && <span className="ml-2 text-xs text-[#10b981]">Recommended</span>}
+            </label>
             <p className="text-xs text-[#64748b] mb-2">{field.description}</p>
             <div className="flex gap-2">
               <div className="relative flex-1">
